@@ -27,8 +27,7 @@
   <main>
     <div class="hero">
       <div class="kicker">✦ Germany · Austria · Europe</div>
-      <h1>Find <em>beautiful leads</em> across Europe.</h1>
-      <p class="sub">Pick a country and a count. We hunt real businesses, pull public emails from official sites, and keep every company unique.</p>
+      <h1>Find <em>leads</em> across Europe.</h1>
     </div>
     <section class="panel">
       <div class="row">
@@ -41,6 +40,7 @@
           <input id="count" type="number" min="1" max="2000" value="500" />
         </div>
         <button class="btn" id="go">Generate Leads</button>
+        <button class="btn ghost" id="stop" disabled>Stop</button>
         <button class="btn ghost" id="csv" disabled>Download CSV</button>
         <a class="btn mint" href="/campaign.html" style="text-decoration:none;display:inline-block">Send campaign →</a>
       </div>
@@ -58,11 +58,14 @@
     const country = document.getElementById("country");
     const count = document.getElementById("count");
     const go = document.getElementById("go");
+    const stop = document.getElementById("stop");
     const csv = document.getElementById("csv");
     const status = document.getElementById("status");
     const rows = document.getElementById("rows");
     const bar = document.getElementById("bar");
     let leads = [];
+    let es = null;
+    const seen = new Set();
 
     fetch("/api/countries").then(r => r.json()).then(list => {
       country.innerHTML = list.map(c => `<option>${c}</option>`).join("");
@@ -76,31 +79,46 @@
       csv.disabled = !leads.length;
     }
 
+    function halt(msg) {
+      es?.close();
+      es = null;
+      go.disabled = false;
+      stop.disabled = true;
+      if (msg) status.textContent = msg;
+    }
+    stop.onclick = () => halt(`Stopped. ${leads.length} unique leads saved.`);
+
     go.onclick = () => {
       leads = [];
+      seen.clear();
       render();
       go.disabled = true;
+      stop.disabled = false;
       const target = Number(count.value) || 50;
-      const es = new EventSource(`/api/generate?country=${encodeURIComponent(country.value)}&count=${target}`);
+      es = new EventSource(`/api/generate?country=${encodeURIComponent(country.value)}&count=${target}`);
       es.onmessage = (ev) => {
         const d = JSON.parse(ev.data);
-        if (d.error) { status.textContent = d.error; es.close(); go.disabled = false; return; }
-        if (d.lead) leads.push(d.lead);
-        if (d.leads) leads = d.leads;
+        if (d.error) { halt(d.error); return; }
+        if (d.lead && !seen.has(d.lead.email)) { seen.add(d.lead.email); leads.push(d.lead); }
+        if (d.leads) {
+          leads = [];
+          seen.clear();
+          for (const l of d.leads) {
+            if (seen.has(l.email)) continue;
+            seen.add(l.email);
+            leads.push(l);
+          }
+        }
         status.textContent = d.status
           ? `${d.status} — ${d.found || leads.length}/${d.target || target}`
           : `Found ${d.found || leads.length}/${d.target || target}`;
         bar.style.width = Math.min(100, ((d.found || leads.length) / (d.target || target)) * 100) + "%";
         render();
-        if (d.done) {
-          es.close();
-          go.disabled = false;
-          status.textContent = d.found < d.target
-            ? `Stopped at ${d.found} valid unique leads (no more found). Download CSV, then send.`
-            : `Done: ${d.found} unique leads. Download CSV, then open Send Emails.`;
-        }
+        if (d.done) halt(d.found < d.target
+          ? `Stopped at ${leads.length} unique leads.`
+          : `Done: ${leads.length} unique leads.`);
       };
-      es.onerror = () => { es.close(); go.disabled = false; if (!leads.length) status.textContent = "Connection failed."; };
+      es.onerror = () => { if (go.disabled) halt(leads.length ? `Stopped. ${leads.length} unique leads saved.` : "Connection failed."); };
     };
 
     csv.onclick = () => {

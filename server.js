@@ -30,13 +30,13 @@ const INDUSTRIES = [
 ];
 
 const CITIES = {
-  Germany: ["Berlin", "Munich", "Hamburg", "Frankfurt", "Cologne", "Stuttgart", "Dusseldorf"],
-  Austria: ["Vienna", "Graz", "Linz", "Salzburg", "Innsbruck"],
-  Switzerland: ["Zurich", "Geneva", "Basel", "Bern"],
-  Netherlands: ["Amsterdam", "Rotterdam", "Utrecht", "The Hague", "Eindhoven"],
+  Germany: ["Berlin", "Munich", "Hamburg", "Frankfurt", "Cologne"],
+  Austria: ["Vienna", "Graz", "Linz", "Salzburg"],
+  Switzerland: ["Zurich", "Geneva", "Basel"],
+  Netherlands: ["Amsterdam", "Rotterdam", "Utrecht"],
   Belgium: ["Brussels", "Antwerp", "Ghent"],
-  France: ["Paris", "Lyon", "Lille", "Toulouse", "Marseille"],
-  Sweden: ["Stockholm", "Gothenburg", "Malmo"],
+  France: ["Paris", "Lyon", "Lille", "Marseille"],
+  Sweden: ["Stockholm", "Gothenburg"],
   Norway: ["Oslo", "Bergen"],
   Denmark: ["Copenhagen", "Aarhus"],
   Finland: ["Helsinki", "Tampere"],
@@ -48,6 +48,38 @@ const CITIES = {
   Portugal: ["Lisbon", "Porto"],
   Luxembourg: ["Luxembourg"],
   Estonia: ["Tallinn"],
+  "United Kingdom": ["London", "Manchester", "Birmingham"],
+  England: ["London", "Manchester", "Bristol"],
+  Scotland: ["Edinburgh", "Glasgow"],
+  Wales: ["Cardiff", "Swansea"],
+  "Northern Ireland": ["Belfast"],
+  Iceland: ["Reykjavik"],
+  Liechtenstein: ["Vaduz"],
+  Monaco: ["Monaco"],
+  Andorra: ["Andorra la Vella"],
+  Malta: ["Valletta"],
+  "San Marino": ["San Marino"],
+  Greece: ["Athens", "Thessaloniki"],
+  Hungary: ["Budapest"],
+  Slovakia: ["Bratislava"],
+  Slovenia: ["Ljubljana"],
+  Croatia: ["Zagreb", "Split"],
+  Romania: ["Bucharest", "Cluj-Napoca"],
+  Bulgaria: ["Sofia", "Plovdiv"],
+  Serbia: ["Belgrade"],
+  "Bosnia and Herzegovina": ["Sarajevo"],
+  Montenegro: ["Podgorica"],
+  "North Macedonia": ["Skopje"],
+  Albania: ["Tirana"],
+  Kosovo: ["Pristina"],
+  Latvia: ["Riga"],
+  Lithuania: ["Vilnius"],
+  Ukraine: ["Kyiv", "Lviv"],
+  Moldova: ["Chisinau"],
+  Belarus: ["Minsk"],
+  Gibraltar: ["Gibraltar"],
+  "Isle of Man": ["Douglas"],
+  Jersey: ["Saint Helier"],
 };
 
 const SKIP_LOCAL = /^(noreply|no-reply|donotreply|do-not-reply|mailer-daemon|postmaster|abuse|privacy|legal|spam|test|example|fake|dummy|webmaster|admin)$/i;
@@ -58,14 +90,23 @@ const BAD_EXT = /\.(png|jpe?g|gif|webp|svg|css|js|woff2?|mp4|pdf)$/i;
 function loadDb() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ emails: [], domains: [], leads: [], sent: [] }));
+    fs.writeFileSync(DB_PATH, JSON.stringify({ emails: [], domains: [], leads: [], sent: [], names: [] }));
   }
   const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
   db.emails ||= [];
   db.domains ||= [];
   db.leads ||= [];
   db.sent ||= [];
+  db.names ||= [];
   return db;
+}
+
+function normName(n) {
+  return String(n || "")
+    .toLowerCase()
+    .replace(/\b(gmbh|ag|ltd|limited|llc|inc|srl|bv|nv|oy|ab|as|sa|sas|plc|kg)\b/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 function saveDb(db) {
@@ -263,8 +304,9 @@ app.get("/api/generate", async (req, res) => {
   }
 
   const db = loadDb();
-  const usedEmail = new Set(db.emails);
-  const usedDomain = new Set(db.domains);
+  const usedEmail = new Set(db.emails.map((e) => String(e).toLowerCase()));
+  const usedDomain = new Set(db.domains.map((d) => String(d).toLowerCase()));
+  const usedName = new Set((db.names || []).concat(db.leads.map((l) => normName(l.name))).filter(Boolean));
   const seenPlace = new Set();
   const results = [];
   const queries = queriesFor(country);
@@ -292,6 +334,8 @@ app.get("/api/generate", async (req, res) => {
           if (seenPlace.has(place.place_id)) continue;
           seenPlace.add(place.place_id);
 
+          const nm = normName(place.name);
+          if (nm && usedName.has(nm)) continue;
           send({ status: `Checking ${place.name}`, found: results.length, target: count });
           const details = await placeWebsite(place.place_id);
           const website = details.website;
@@ -299,6 +343,9 @@ app.get("/api/generate", async (req, res) => {
 
           const host = rootHost(website);
           if (!host || usedDomain.has(host)) continue;
+          const company = details.name || place.name;
+          const cn = normName(company);
+          if (cn && usedName.has(cn)) continue;
 
           const emails = await emailsFromSite(website);
           for (const email of emails) {
@@ -309,10 +356,12 @@ app.get("/api/generate", async (req, res) => {
             usedEmail.add(email);
             usedDomain.add(d);
             usedDomain.add(host);
-            const lead = { name: details.name || place.name, email, country };
+            if (cn) usedName.add(cn);
+            const lead = { name: company, email, country };
             results.push(lead);
             db.emails.push(email);
             db.domains.push(d, host);
+            db.names.push(cn);
             db.leads.push({ ...lead, at: new Date().toISOString() });
             send({ found: results.length, target: count, lead });
             break;
