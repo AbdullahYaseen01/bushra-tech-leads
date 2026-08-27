@@ -35,6 +35,7 @@ const CITIES = {
   Canada: ["Toronto", "Vancouver", "Montreal", "Calgary", "Ottawa"],
   Norway: ["Oslo", "Bergen", "Stavanger"],
   Singapore: ["Singapore"],
+  "United States": ["New York", "San Francisco", "Austin", "Seattle", "Chicago", "Boston", "Los Angeles"],
   Switzerland: ["Zurich", "Geneva", "Basel"],
   Netherlands: ["Amsterdam", "Rotterdam", "Utrecht"],
   Belgium: ["Brussels", "Antwerp", "Ghent"],
