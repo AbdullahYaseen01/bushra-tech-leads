@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bushra Tech — Send Campaign</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="bg"></div>
+  <nav>
+    <a class="brand" href="/">
+      <div class="mark">B</div>
+      <div>
+        <b>Bushra Tech</b>
+        <span>Product outreach</span>
+      </div>
+    </a>
+    <div class="links">
+      <a href="/">Find Leads</a>
+      <a class="on" href="/campaign.html">Send Emails</a>
+    </div>
+  </nav>
+  <main>
+    <div class="hero">
+      <div class="kicker">✦ CSV in · product email out</div>
+      <h1>Upload your list. <em>We send the pitch.</em></h1>
+      <p class="sub">Download CSV from Find Leads, drop it here, and we email each company about Bushra Tech — your AI SaaS product partner from idea to scale.</p>
+    </div>
+    <section class="panel">
+      <label class="drop" id="drop">
+        <strong>Drop your leads CSV here</strong>
+        <p>or click to upload · columns: name, email</p>
+        <input id="file" type="file" accept=".csv,text/csv" hidden />
+      </label>
+      <div class="row">
+        <button class="btn" id="send" disabled>Send product emails</button>
+        <span class="status" id="mailStatus" style="margin:0"></span>
+      </div>
+      <p class="status" id="status">Waiting for a CSV.</p>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="preview">
+        <h3>What they receive</h3>
+        <p>
+          Subject: A product partner for {{company}} — Bushra Tech<br /><br />
+          Short intro as Bushra Technology &amp; Services: we design, build, and scale AI-powered software
+          (custom software, AI solutions, cloud, mobile, Web3). Mention of shipped work like SMART Insight
+          and Next Global Express, plus bushratech.com. Personalized with the company name from your CSV.
+        </p>
+      </div>
+      <div class="table-wrap" style="margin-top:18px">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Status</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script>
+    const drop = document.getElementById("drop");
+    const file = document.getElementById("file");
+    const send = document.getElementById("send");
+    const status = document.getElementById("status");
+    const mailStatus = document.getElementById("mailStatus");
+    const rows = document.getElementById("rows");
+    const bar = document.getElementById("bar");
+    let leads = [];
+
+    fetch("/api/mail-ready").then(r => r.json()).then(j => {
+      mailStatus.textContent = j.ready ? "Mailbox ready" : "Add SMTP_USER and SMTP_PASS in .env";
+      mailStatus.className = "chip " + (j.ready ? "ok" : "bad");
+    });
+
+    function esc(s) {
+      return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+    }
+    function chip(st) {
+      const cls = st === "sent" ? "ok" : st === "failed" || st === "skipped" ? "bad" : "wait";
+      return `<span class="chip ${cls}">${esc(st)}</span>`;
+    }
+    function render() {
+      rows.innerHTML = leads.map(l => `<tr><td>${esc(l.name || "—")}</td><td>${esc(l.email)}</td><td>${chip(l.status || "queued")}</td></tr>`).join("");
+      send.disabled = !leads.length;
+    }
+
+    function parseCsv(text) {
+      const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter(Boolean);
+      if (!lines.length) return [];
+      const cells = (line) => {
+        const out = [];
+        let cur = "", q = false;
+        for (let i = 0; i < line.length; i++) {
+          const c = line[i];
+          if (c === '"') { q = !q; continue; }
+          if (c === "," && !q) { out.push(cur.trim()); cur = ""; continue; }
+          cur += c;
+        }
+        out.push(cur.trim());
+        return out;
+      };
+      const head = cells(lines[0]).map(h => h.toLowerCase());
+      const ei = head.findIndex(h => h.includes("email"));
+      const ni = head.findIndex(h => h.includes("name"));
+      const start = ei >= 0 ? 1 : 0;
+      const emailIdx = ei >= 0 ? ei : (head.length > 1 ? 1 : 0);
+      const nameIdx = ni >= 0 ? ni : 0;
+      const seen = new Set();
+      const list = [];
+      for (let i = start; i < lines.length; i++) {
+        const cols = cells(lines[i]);
+        const email = (cols[emailIdx] || "").toLowerCase();
+        if (!email.includes("@") || seen.has(email)) continue;
+        seen.add(email);
+        list.push({ name: cols[nameIdx] || "", email, status: "queued" });
+      }
+      return list;
+    }
+
+    drop.onclick = () => file.click();
+    drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("hot"); };
+    drop.ondragleave = () => drop.classList.remove("hot");
+    drop.ondrop = (e) => {
+      e.preventDefault();
+      drop.classList.remove("hot");
+      if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
+    };
+    file.onchange = () => { if (file.files[0]) readFile(file.files[0]); };
+
+    function readFile(f) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        leads = parseCsv(String(reader.result || ""));
+        status.textContent = leads.length ? `${leads.length} unique emails ready to send.` : "No emails found in that CSV.";
+        bar.style.width = "0";
+        render();
+      };
+      reader.readAsText(f);
+    }
+
+    send.onclick = async () => {
+      send.disabled = true;
+      status.textContent = "Sending…";
+      const res = await fetch("/api/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leads: leads.map(({ name, email }) => ({ name, email })) }),
+      });
+      if (!res.body) {
+        status.textContent = "Send failed.";
+        send.disabled = false;
+        return;
+      }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        buf += dec.decode(value || new Uint8Array(), { stream: !done });
+        const parts = buf.split("\n");
+        buf = parts.pop() || "";
+        for (const line of parts) {
+          if (!line.trim()) continue;
+          const d = JSON.parse(line);
+          if (d.error) status.textContent = d.error;
+          if (d.email) {
+            const item = leads.find(l => l.email === d.email);
+            if (item) item.status = d.status;
+          }
+          if (typeof d.sent === "number") {
+            bar.style.width = Math.min(100, (d.doneCount / d.total) * 100) + "%";
+            status.textContent = `Sent ${d.sent}/${d.total} · failed ${d.failed} · skipped ${d.skipped}`;
+          }
+          render();
+        }
+        if (done) break;
+      }
+      send.disabled = false;
+    };
+  </script>
+</body>
+</html>

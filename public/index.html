@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bushra Tech — Europe Leads</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="bg"></div>
+  <nav>
+    <a class="brand" href="/">
+      <div class="mark">B</div>
+      <div>
+        <b>Bushra Tech</b>
+        <span>Europe lead atelier</span>
+      </div>
+    </a>
+    <div class="links">
+      <a class="on" href="/">Find Leads</a>
+      <a href="/campaign.html">Send Emails</a>
+    </div>
+  </nav>
+  <main>
+    <div class="hero">
+      <div class="kicker">✦ Germany · Austria · Europe</div>
+      <h1>Find <em>beautiful leads</em> across Europe.</h1>
+      <p class="sub">Pick a country and a count. We hunt real businesses, pull public emails from official sites, and keep every company unique.</p>
+    </div>
+    <section class="panel">
+      <div class="row">
+        <div>
+          <label for="country">Target country</label>
+          <select id="country"></select>
+        </div>
+        <div>
+          <label for="count">Number of leads</label>
+          <input id="count" type="number" min="1" max="2000" value="500" />
+        </div>
+        <button class="btn" id="go">Generate Leads</button>
+        <button class="btn ghost" id="csv" disabled>Download CSV</button>
+        <a class="btn mint" href="/campaign.html" style="text-decoration:none;display:inline-block">Send campaign →</a>
+      </div>
+      <p class="status" id="status">Ready when you are.</p>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script>
+    const country = document.getElementById("country");
+    const count = document.getElementById("count");
+    const go = document.getElementById("go");
+    const csv = document.getElementById("csv");
+    const status = document.getElementById("status");
+    const rows = document.getElementById("rows");
+    const bar = document.getElementById("bar");
+    let leads = [];
+
+    fetch("/api/countries").then(r => r.json()).then(list => {
+      country.innerHTML = list.map(c => `<option>${c}</option>`).join("");
+    });
+
+    function esc(s) {
+      return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+    }
+    function render() {
+      rows.innerHTML = leads.map(l => `<tr><td>${esc(l.name)}</td><td>${esc(l.email)}</td></tr>`).join("");
+      csv.disabled = !leads.length;
+    }
+
+    go.onclick = () => {
+      leads = [];
+      render();
+      go.disabled = true;
+      const target = Number(count.value) || 50;
+      const es = new EventSource(`/api/generate?country=${encodeURIComponent(country.value)}&count=${target}`);
+      es.onmessage = (ev) => {
+        const d = JSON.parse(ev.data);
+        if (d.error) { status.textContent = d.error; es.close(); go.disabled = false; return; }
+        if (d.lead) leads.push(d.lead);
+        if (d.leads) leads = d.leads;
+        status.textContent = d.status
+          ? `${d.status} — ${d.found || leads.length}/${d.target || target}`
+          : `Found ${d.found || leads.length}/${d.target || target}`;
+        bar.style.width = Math.min(100, ((d.found || leads.length) / (d.target || target)) * 100) + "%";
+        render();
+        if (d.done) {
+          es.close();
+          go.disabled = false;
+          status.textContent = d.found < d.target
+            ? `Stopped at ${d.found} valid unique leads (no more found). Download CSV, then send.`
+            : `Done: ${d.found} unique leads. Download CSV, then open Send Emails.`;
+        }
+      };
+      es.onerror = () => { es.close(); go.disabled = false; if (!leads.length) status.textContent = "Connection failed."; };
+    };
+
+    csv.onclick = () => {
+      const body = "name,email\n" + leads.map(l => `${JSON.stringify(l.name)},${l.email}`).join("\n");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([body], { type: "text/csv" }));
+      a.download = "bushra-tech-leads.csv";
+      a.click();
+    };
+  </script>
+</body>
+</html>
