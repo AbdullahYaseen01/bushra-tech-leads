@@ -130,7 +130,7 @@ h1 em {
 }
 .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: end; }
 label { display: block; font-size: 0.75rem; color: var(--gold-2); margin-bottom: 8px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-select, input[type="number"], input[type="text"] {
+select, input[type="number"], input[type="text"], textarea {
   background: rgba(255, 246, 234, 0.06);
   color: var(--cream);
   border: 1px solid var(--line);
@@ -141,7 +141,8 @@ select, input[type="number"], input[type="text"] {
   outline: none;
 }
 select option { background: #12241b; }
-select:focus, input:focus { border-color: var(--mint); box-shadow: 0 0 0 4px rgba(60, 239, 196, 0.15); }
+select:focus, input:focus, textarea:focus { border-color: var(--mint); box-shadow: 0 0 0 4px rgba(60, 239, 196, 0.15); }
+textarea { width: 100%; resize: vertical; min-height: 160px; line-height: 1.5; font-family: inherit; }
 
 .btn {
   border: 0;

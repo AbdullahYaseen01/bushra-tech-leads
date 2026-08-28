@@ -41,14 +41,24 @@
       </div>
       <p class="status" id="status">Waiting for a CSV.</p>
       <div class="bar"><i id="bar"></i></div>
-      <div class="preview">
-        <h3>What they receive</h3>
-        <p>
-          Subject: A product partner for {{company}} — Bushra Tech<br /><br />
-          Short intro as Bushra Technology &amp; Services: we design, build, and scale AI-powered software
-          (custom software, AI solutions, cloud, mobile, Web3). Mention of shipped work like SMART Insight
-          and Next Global Express, plus bushratech.com. Personalized with the company name from your CSV.
-        </p>
+      <div class="preview" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;">Email Template (Editable)</h3>
+          <span style="font-size:0.8rem;color:var(--muted);">Use <code>{{name}}</code> for business name</span>
+        </div>
+        <div>
+          <label for="tmplSubject" style="margin-bottom:6px;">Subject</label>
+          <input id="tmplSubject" type="text" style="width:100%;" />
+        </div>
+        <div>
+          <label for="tmplBody" style="margin-bottom:6px;">Message Body</label>
+          <textarea id="tmplBody" rows="8"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="btn ghost" id="saveTmpl" type="button" style="padding:8px 16px;font-size:0.85rem;">Save Template</button>
+          <button class="btn ghost" id="resetTmpl" type="button" style="padding:8px 16px;font-size:0.85rem;border-color:var(--line);color:var(--muted);">Reset Default</button>
+          <span id="saveNotice" style="font-size:0.85rem;color:var(--mint);display:none;">Template saved!</span>
+        </div>
       </div>
       <div class="table-wrap" style="margin-top:18px">
         <table>
@@ -66,7 +76,63 @@
     const mailStatus = document.getElementById("mailStatus");
     const rows = document.getElementById("rows");
     const bar = document.getElementById("bar");
+    const tmplSubject = document.getElementById("tmplSubject");
+    const tmplBody = document.getElementById("tmplBody");
+    const saveTmpl = document.getElementById("saveTmpl");
+    const resetTmpl = document.getElementById("resetTmpl");
+    const saveNotice = document.getElementById("saveNotice");
     let leads = [];
+
+    const DEFAULT_TMPL = {
+      subject: "A product partner for {{name}} — Bushra Tech",
+      body: `Hello {{name}},
+
+Bushra Technology & Services is an AI SaaS product partner — we design, build, and ship intelligent software for founders and enterprises, from first idea to scale.
+
+We help companies like yours with:
+• Custom software development
+• AI solutions and automation
+• Cloud, mobile apps, and Web3 products
+
+We've shipped products that grow, including SMART Insight (AI business intelligence) and Next Global Express (logistics tracking & CRM), plus a legal SaaS platform now valued at $35M.
+
+If you are exploring a new product, AI inside an existing workflow, or a rebuild that needs to hold up in production, we would be glad to talk.
+
+See our work: https://bushratech.com
+
+Warm regards,
+Bushra Tech
+https://bushratech.com`
+    };
+
+    function loadTemplate() {
+      try {
+        const saved = JSON.parse(localStorage.getItem("bushra_email_tmpl") || "null");
+        if (saved && saved.subject && saved.body) {
+          tmplSubject.value = saved.subject;
+          tmplBody.value = saved.body;
+          return;
+        }
+      } catch {}
+      tmplSubject.value = DEFAULT_TMPL.subject;
+      tmplBody.value = DEFAULT_TMPL.body;
+    }
+    loadTemplate();
+
+    saveTmpl.onclick = () => {
+      localStorage.setItem("bushra_email_tmpl", JSON.stringify({
+        subject: tmplSubject.value.trim() || DEFAULT_TMPL.subject,
+        body: tmplBody.value.trim() || DEFAULT_TMPL.body
+      }));
+      saveNotice.style.display = "inline";
+      setTimeout(() => { saveNotice.style.display = "none"; }, 2500);
+    };
+
+    resetTmpl.onclick = () => {
+      localStorage.removeItem("bushra_email_tmpl");
+      tmplSubject.value = DEFAULT_TMPL.subject;
+      tmplBody.value = DEFAULT_TMPL.body;
+    };
 
     fetch("/api/mail-ready").then(r => r.json()).then(j => {
       mailStatus.textContent = j.ready ? "Mailbox ready" : "Add SMTP_USER and SMTP_PASS in .env";
@@ -142,10 +208,17 @@
     send.onclick = async () => {
       send.disabled = true;
       status.textContent = "Sending…";
+      const customTemplate = {
+        subject: tmplSubject.value.trim() || DEFAULT_TMPL.subject,
+        body: tmplBody.value.trim() || DEFAULT_TMPL.body
+      };
       const res = await fetch("/api/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leads: leads.map(({ name, email }) => ({ name, email })) }),
+        body: JSON.stringify({
+          leads: leads.map(({ name, email }) => ({ name, email })),
+          customTemplate
+        }),
       });
       if (!res.body) {
         status.textContent = "Send failed.";

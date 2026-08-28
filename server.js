@@ -278,6 +278,18 @@ ${site}`;
   return { subject, text, html };
 }
 
+function formatEmail(name, customTemplate) {
+  if (customTemplate && typeof customTemplate.subject === "string" && typeof customTemplate.body === "string") {
+    const raw = name && name !== "—" ? name : "your team";
+    const sub = customTemplate.subject.replace(/\{\{\s*(name|company)\s*\}\}/gi, raw);
+    const textBody = customTemplate.body.replace(/\{\{\s*(name|company)\s*\}\}/gi, raw);
+    const escaped = textBody.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const htmlBody = `<div style="font-family:Georgia,serif;color:#1a1814;line-height:1.6;max-width:560px;white-space:pre-wrap;">${escaped}</div>`;
+    return { subject: sub, text: textBody, html: htmlBody };
+  }
+  return pitch(name);
+}
+
 const app = express();
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -396,6 +408,7 @@ app.post("/api/send", async (req, res) => {
     return res.end();
   }
   const incoming = Array.isArray(req.body?.leads) ? req.body.leads : [];
+  const customTemplate = req.body?.customTemplate;
   const db = loadDb();
   if (!Array.isArray(db.sent)) db.sent = [];
   const sentSet = new Set(db.sent);
@@ -414,7 +427,7 @@ app.post("/api/send", async (req, res) => {
       continue;
     }
     try {
-      const msg = pitch(name);
+      const msg = formatEmail(name, customTemplate);
       await mailer.sendMail({ from, to: email, ...msg });
       sentSet.add(email);
       db.sent.push(email);
