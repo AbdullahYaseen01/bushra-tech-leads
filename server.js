@@ -12,22 +12,106 @@ const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = process.env.VERCEL ? path.join("/tmp", "bushra-leads") : path.join(__dirname, "data");
 const DB_PATH = path.join(DATA_DIR, "leads.json");
 
-const INDUSTRIES = [
-  "software company",
-  "IT company",
-  "SaaS company",
-  "AI company",
-  "e-commerce company",
-  "logistics company",
-  "fintech company",
-  "healthcare software",
-  "startup",
-  "web development company",
+const NEGATIVE_KEYWORDS = [
+  "software development",
+  "software agency",
+  "software house",
+  "software consultancy",
+  "web development",
+  "web design",
   "digital agency",
+  "app development",
   "mobile app development",
-  "cloud computing company",
-  "cybersecurity company",
+  "custom software",
+  "it services",
+  "it consultancy",
+  "it consulting",
+  "software engineering",
+  "offshore development",
+  "dev shop",
+  "dev agency",
+  "staff augmentation",
+  "software consulting",
+  "softwareunternehmen",
+  "softwareentwicklung",
+  "webagentur",
+  "digitalagentur",
+  "it-dienstleister",
+  "software solutions provider"
 ];
+
+const INDUSTRY_CATEGORIES = {
+  "All Target Clients (Logistics, Legal, E-com, Finance, Health)": [
+    "logistics company",
+    "freight forwarding",
+    "supply chain",
+    "law firm",
+    "corporate law",
+    "e-commerce brand",
+    "online retailer",
+    "accounting firm",
+    "tax consultancy",
+    "medical clinic",
+    "wealth management",
+    "property management",
+    "manufacturing company",
+    "biotech startup",
+    "cleantech startup"
+  ],
+  "Logistics & Supply Chain (CRM/Tracking)": [
+    "logistics company",
+    "freight forwarding company",
+    "supply chain management",
+    "transport and logistics",
+    "cargo shipping company",
+    "warehousing company"
+  ],
+  "Law Firms & Legaltech": [
+    "law firm",
+    "corporate law firm",
+    "commercial law firm",
+    "patent attorney",
+    "legal consultancy",
+    "notary office"
+  ],
+  "E-Commerce & Retail Brands": [
+    "e-commerce company",
+    "online retail brand",
+    "direct to consumer brand",
+    "fashion brand headquarters",
+    "cosmetics brand headquarters",
+    "wholesale distribution"
+  ],
+  "Fintech & Accounting / Professional Services": [
+    "accounting firm",
+    "tax consultancy firm",
+    "auditing firm",
+    "wealth management firm",
+    "financial advisory company",
+    "insurance broker"
+  ],
+  "Healthcare & Clinics": [
+    "private medical clinic",
+    "specialist medical center",
+    "diagnostic center",
+    "dental clinic",
+    "telehealth provider",
+    "health services"
+  ],
+  "Real Estate & Property Management": [
+    "real estate agency",
+    "property management company",
+    "commercial real estate",
+    "real estate investment firm"
+  ],
+  "Non-Tech Startups & Manufacturing": [
+    "biotech startup",
+    "cleantech company",
+    "edtech company",
+    "manufacturing company",
+    "industrial manufacturing"
+  ]
+};
 
 const CITIES = {
   Germany: ["Berlin", "Munich", "Hamburg", "Frankfurt", "Cologne"],
@@ -220,11 +304,36 @@ async function emailsFromSite(website) {
   return own.length ? own : list;
 }
 
-function queriesFor(country) {
+function isCompetitorOrAgency(name, text = "") {
+  const checkName = (name || "").toLowerCase();
+  for (const kw of NEGATIVE_KEYWORDS) {
+    if (checkName.includes(kw)) return true;
+  }
+  if (text) {
+    const lower = text.toLowerCase();
+    for (const kw of NEGATIVE_KEYWORDS) {
+      if (lower.includes(kw) && (
+        lower.includes("we build") || 
+        lower.includes("our development team") || 
+        lower.includes("hire dedicated developers") || 
+        lower.includes("custom software development") ||
+        lower.includes("softwareentwicklung")
+      )) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function queriesFor(country, categoryKey) {
   const cities = CITIES[country] || [""];
+  const industries = (categoryKey && INDUSTRY_CATEGORIES[categoryKey])
+    ? INDUSTRY_CATEGORIES[categoryKey]
+    : INDUSTRY_CATEGORIES["All Target Clients (Logistics, Legal, E-com, Finance, Health)"];
   const out = [];
   for (const city of cities) {
-    for (const ind of INDUSTRIES) {
+    for (const ind of industries) {
       out.push(city ? `${ind} in ${city}, ${country}` : `${ind} in ${country}`);
     }
   }
@@ -298,6 +407,10 @@ app.get("/api/countries", (_req, res) => {
   res.json(Object.keys(CITIES));
 });
 
+app.get("/api/industries", (_req, res) => {
+  res.json(Object.keys(INDUSTRY_CATEGORIES));
+});
+
 app.get("/api/generate", async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -312,6 +425,7 @@ app.get("/api/generate", async (req, res) => {
   }
 
   const country = String(req.query.country || "");
+  const industry = String(req.query.industry || "");
   const count = Math.min(2000, Math.max(1, Number(req.query.count) || 50));
   if (!CITIES[country]) {
     send({ error: "Select a valid country." });
@@ -324,7 +438,7 @@ app.get("/api/generate", async (req, res) => {
   const usedName = new Set((db.names || []).concat(db.leads.map((l) => normName(l.name))).filter(Boolean));
   const seenPlace = new Set();
   const results = [];
-  const queries = queriesFor(country);
+  const queries = queriesFor(country, industry);
   let q = 0;
   let aborted = false;
   req.on("close", () => {
@@ -349,6 +463,8 @@ app.get("/api/generate", async (req, res) => {
           if (seenPlace.has(place.place_id)) continue;
           seenPlace.add(place.place_id);
 
+          if (isCompetitorOrAgency(place.name)) continue;
+
           const nm = normName(place.name);
           if (nm && usedName.has(nm)) continue;
           send({ status: `Checking ${place.name}`, found: results.length, target: count });
@@ -359,6 +475,7 @@ app.get("/api/generate", async (req, res) => {
           const host = rootHost(website);
           if (!host || usedDomain.has(host)) continue;
           const company = details.name || place.name;
+          if (isCompetitorOrAgency(company)) continue;
           const cn = normName(company);
           if (cn && usedName.has(cn)) continue;
 
