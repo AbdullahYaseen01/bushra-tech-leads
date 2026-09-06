@@ -41,7 +41,7 @@ const NEGATIVE_KEYWORDS = [
 ];
 
 const INDUSTRY_CATEGORIES = {
-  "All Target Clients": [
+  "All Target Clients (Logistics, Legal, E-com, Finance, Health)": [
     "logistics company",
     "freight forwarding",
     "supply chain",
@@ -331,7 +331,7 @@ function queriesFor(country, categoryKey) {
   const cities = CITIES[country] || [""];
   const industries = (categoryKey && INDUSTRY_CATEGORIES[categoryKey])
     ? INDUSTRY_CATEGORIES[categoryKey]
-    : INDUSTRY_CATEGORIES["All Target Clients"];
+    : INDUSTRY_CATEGORIES["All Target Clients (Logistics, Legal, E-com, Finance, Health)"];
   const out = [];
   for (const city of cities) {
     for (const ind of industries) {
@@ -421,7 +421,7 @@ app.get("/api/generate", async (req, res) => {
   const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
   if (!KEY) {
-    send({ error: "Search is not available right now. Please try again later." });
+    send({ error: "Add GOOGLE_MAPS_API_KEY to .env and restart." });
     return res.end();
   }
 
@@ -522,7 +522,7 @@ app.post("/api/send", async (req, res) => {
   res.setHeader("Content-Type", "application/x-ndjson");
   const write = (obj) => res.write(JSON.stringify(obj) + "\n");
   if (!mailReady()) {
-    write({ error: "Email sending is not set up yet. Please try again later." });
+    write({ error: "Add SMTP_USER and SMTP_PASS to .env, then restart." });
     return res.end();
   }
   const incoming = Array.isArray(req.body?.leads) ? req.body.leads : [];
