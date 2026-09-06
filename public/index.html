@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Bushra Tech — Europe Leads</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,600&display=swap" rel="stylesheet" />
@@ -11,6 +12,7 @@
 </head>
 <body>
   <div class="bg"></div>
+
   <nav>
     <a class="brand" href="/">
       <div class="mark">B</div>
@@ -19,37 +21,45 @@
         <span>Europe lead atelier</span>
       </div>
     </a>
+
     <div class="links">
       <a class="on" href="/">Find Leads</a>
       <a href="/campaign.html">Send Emails</a>
     </div>
   </nav>
+
   <main>
     <div class="hero">
       <div class="kicker">✦ Germany · Austria · Canada · Norway · Singapore · UAE · USA</div>
       <h1>Find <em>leads</em> across Europe.</h1>
     </div>
+
     <section class="panel">
       <div class="row">
         <div>
           <label for="country">Target country</label>
           <select id="country"></select>
         </div>
+
         <div>
           <label for="industry">Industry / ICP</label>
           <select id="industry"></select>
         </div>
+
         <div>
           <label for="count">Number of leads</label>
           <input id="count" type="number" min="1" max="2000" value="500" />
         </div>
+
         <button class="btn" id="go">Generate Leads</button>
         <button class="btn ghost" id="stop" disabled>Stop</button>
         <button class="btn ghost" id="csv" disabled>Download CSV</button>
         <a class="btn mint" href="/campaign.html" style="text-decoration:none;display:inline-block">Send campaign →</a>
       </div>
+
       <p class="status" id="status">Ready when you are.</p>
       <div class="bar"><i id="bar"></i></div>
+
       <div class="table-wrap">
         <table>
           <thead><tr><th>Name</th><th>Email</th></tr></thead>
@@ -58,6 +68,7 @@
       </div>
     </section>
   </main>
+
   <script>
     const country = document.getElementById("country");
     const industry = document.getElementById("industry");
@@ -68,6 +79,7 @@
     const status = document.getElementById("status");
     const rows = document.getElementById("rows");
     const bar = document.getElementById("bar");
+
     let leads = [];
     let es = null;
     const seen = new Set();
@@ -75,6 +87,7 @@
     fetch("/api/countries").then(r => r.json()).then(list => {
       country.innerHTML = list.map(c => `<option>${c}</option>`).join("");
     });
+
     fetch("/api/industries").then(r => r.json()).then(list => {
       industry.innerHTML = list.map(i => `<option>${i}</option>`).join("");
     });
@@ -82,6 +95,7 @@
     function esc(s) {
       return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
     }
+
     function render() {
       rows.innerHTML = leads.map(l => `<tr><td>${esc(l.name)}</td><td>${esc(l.email)}</td></tr>`).join("");
       csv.disabled = !leads.length;
@@ -94,22 +108,32 @@
       stop.disabled = true;
       if (msg) status.textContent = msg;
     }
+
     stop.onclick = () => halt(`Stopped. ${leads.length} unique leads saved.`);
 
     go.onclick = () => {
       leads = [];
       seen.clear();
       render();
+
       go.disabled = true;
       stop.disabled = false;
+
       const target = Number(count.value) || 50;
       const indVal = encodeURIComponent(industry.value || "");
       const ctryVal = encodeURIComponent(country.value || "");
+
       es = new EventSource(`/api/generate?country=${ctryVal}&industry=${indVal}&count=${target}`);
+
       es.onmessage = (ev) => {
         const d = JSON.parse(ev.data);
         if (d.error) { halt(d.error); return; }
-        if (d.lead && !seen.has(d.lead.email)) { seen.add(d.lead.email); leads.push(d.lead); }
+
+        if (d.lead && !seen.has(d.lead.email)) {
+          seen.add(d.lead.email);
+          leads.push(d.lead);
+        }
+
         if (d.leads) {
           leads = [];
           seen.clear();
@@ -119,16 +143,26 @@
             leads.push(l);
           }
         }
+
         status.textContent = d.status
           ? `${d.status} — ${d.found || leads.length}/${d.target || target}`
           : `Found ${d.found || leads.length}/${d.target || target}`;
+
         bar.style.width = Math.min(100, ((d.found || leads.length) / (d.target || target)) * 100) + "%";
         render();
-        if (d.done) halt(d.found < d.target
-          ? `Stopped at ${leads.length} unique leads.`
-          : `Done: ${leads.length} unique leads.`);
+
+        if (d.done) {
+          halt(d.found < d.target
+            ? `Stopped at ${leads.length} unique leads.`
+            : `Done: ${leads.length} unique leads.`);
+        }
       };
-      es.onerror = () => { if (go.disabled) halt(leads.length ? `Stopped. ${leads.length} unique leads saved.` : "Connection failed."); };
+
+      es.onerror = () => {
+        if (go.disabled) {
+          halt(leads.length ? `Stopped. ${leads.length} unique leads saved.` : "Connection failed.");
+        }
+      };
     };
 
     csv.onclick = () => {

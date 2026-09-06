@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Bushra Tech — Send Campaign</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,600&display=swap" rel="stylesheet" />
@@ -11,6 +12,7 @@
 </head>
 <body>
   <div class="bg"></div>
+
   <nav>
     <a class="brand" href="/">
       <div class="mark">B</div>
@@ -19,47 +21,57 @@
         <span>Product outreach</span>
       </div>
     </a>
+
     <div class="links">
       <a href="/">Find Leads</a>
       <a class="on" href="/campaign.html">Send Emails</a>
     </div>
   </nav>
+
   <main>
     <div class="hero">
       <div class="kicker">✦ CSV in · product email out</div>
       <h1>Upload your list. <em>We send the pitch.</em></h1>
     </div>
+
     <section class="panel">
       <label class="drop" id="drop">
         <strong>Drop your leads CSV here</strong>
         <p>or click to upload · columns: name, email</p>
         <input id="file" type="file" accept=".csv,text/csv" hidden />
       </label>
+
       <div class="row">
         <button class="btn" id="send" disabled>Send product emails</button>
         <span class="status" id="mailStatus" style="margin:0"></span>
       </div>
+
       <p class="status" id="status">Waiting for a CSV.</p>
       <div class="bar"><i id="bar"></i></div>
+
       <div class="preview" style="display:flex;flex-direction:column;gap:12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <h3 style="margin:0;">Email Template (Editable)</h3>
           <span style="font-size:0.8rem;color:var(--muted);">Use <code>{{name}}</code> for business name</span>
         </div>
+
         <div>
           <label for="tmplSubject" style="margin-bottom:6px;">Subject</label>
           <input id="tmplSubject" type="text" style="width:100%;" />
         </div>
+
         <div>
           <label for="tmplBody" style="margin-bottom:6px;">Message Body</label>
           <textarea id="tmplBody" rows="8"></textarea>
         </div>
+
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
           <button class="btn ghost" id="saveTmpl" type="button" style="padding:8px 16px;font-size:0.85rem;">Save Template</button>
           <button class="btn ghost" id="resetTmpl" type="button" style="padding:8px 16px;font-size:0.85rem;border-color:var(--line);color:var(--muted);">Reset Default</button>
           <span id="saveNotice" style="font-size:0.85rem;color:var(--mint);display:none;">Template saved!</span>
         </div>
       </div>
+
       <div class="table-wrap" style="margin-top:18px">
         <table>
           <thead><tr><th>Name</th><th>Email</th><th>Status</th></tr></thead>
@@ -68,6 +80,7 @@
       </div>
     </section>
   </main>
+
   <script>
     const drop = document.getElementById("drop");
     const file = document.getElementById("file");
@@ -81,6 +94,7 @@
     const saveTmpl = document.getElementById("saveTmpl");
     const resetTmpl = document.getElementById("resetTmpl");
     const saveNotice = document.getElementById("saveNotice");
+
     let leads = [];
 
     const DEFAULT_TMPL = {
@@ -114,9 +128,11 @@ https://bushratech.com`
           return;
         }
       } catch {}
+
       tmplSubject.value = DEFAULT_TMPL.subject;
       tmplBody.value = DEFAULT_TMPL.body;
     }
+
     loadTemplate();
 
     saveTmpl.onclick = () => {
@@ -124,6 +140,7 @@ https://bushratech.com`
         subject: tmplSubject.value.trim() || DEFAULT_TMPL.subject,
         body: tmplBody.value.trim() || DEFAULT_TMPL.body
       }));
+
       saveNotice.style.display = "inline";
       setTimeout(() => { saveNotice.style.display = "none"; }, 2500);
     };
@@ -142,10 +159,12 @@ https://bushratech.com`
     function esc(s) {
       return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
     }
+
     function chip(st) {
       const cls = st === "sent" ? "ok" : st === "failed" || st === "skipped" ? "bad" : "wait";
       return `<span class="chip ${cls}">${esc(st)}</span>`;
     }
+
     function render() {
       rows.innerHTML = leads.map(l => `<tr><td>${esc(l.name || "—")}</td><td>${esc(l.email)}</td><td>${chip(l.status || "queued")}</td></tr>`).join("");
       send.disabled = !leads.length;
@@ -154,26 +173,32 @@ https://bushratech.com`
     function parseCsv(text) {
       const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter(Boolean);
       if (!lines.length) return [];
+
       const cells = (line) => {
         const out = [];
         let cur = "", q = false;
+
         for (let i = 0; i < line.length; i++) {
           const c = line[i];
           if (c === '"') { q = !q; continue; }
           if (c === "," && !q) { out.push(cur.trim()); cur = ""; continue; }
           cur += c;
         }
+
         out.push(cur.trim());
         return out;
       };
+
       const head = cells(lines[0]).map(h => h.toLowerCase());
       const ei = head.findIndex(h => h.includes("email"));
       const ni = head.findIndex(h => h.includes("name"));
       const start = ei >= 0 ? 1 : 0;
       const emailIdx = ei >= 0 ? ei : (head.length > 1 ? 1 : 0);
       const nameIdx = ni >= 0 ? ni : 0;
+
       const seen = new Set();
       const list = [];
+
       for (let i = start; i < lines.length; i++) {
         const cols = cells(lines[i]);
         const email = (cols[emailIdx] || "").toLowerCase();
@@ -181,37 +206,51 @@ https://bushratech.com`
         seen.add(email);
         list.push({ name: cols[nameIdx] || "", email, status: "queued" });
       }
+
       return list;
     }
 
     drop.onclick = () => file.click();
-    drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("hot"); };
+
+    drop.ondragover = (e) => {
+      e.preventDefault();
+      drop.classList.add("hot");
+    };
+
     drop.ondragleave = () => drop.classList.remove("hot");
+
     drop.ondrop = (e) => {
       e.preventDefault();
       drop.classList.remove("hot");
       if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
     };
-    file.onchange = () => { if (file.files[0]) readFile(file.files[0]); };
+
+    file.onchange = () => {
+      if (file.files[0]) readFile(file.files[0]);
+    };
 
     function readFile(f) {
       const reader = new FileReader();
+
       reader.onload = () => {
         leads = parseCsv(String(reader.result || ""));
         status.textContent = leads.length ? `${leads.length} unique emails ready to send.` : "No emails found in that CSV.";
         bar.style.width = "0";
         render();
       };
+
       reader.readAsText(f);
     }
 
     send.onclick = async () => {
       send.disabled = true;
       status.textContent = "Sending…";
+
       const customTemplate = {
         subject: tmplSubject.value.trim() || DEFAULT_TMPL.subject,
         body: tmplBody.value.trim() || DEFAULT_TMPL.body
       };
+
       const res = await fetch("/api/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -220,35 +259,44 @@ https://bushratech.com`
           customTemplate
         }),
       });
+
       if (!res.body) {
         status.textContent = "Send failed.";
         send.disabled = false;
         return;
       }
+
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = "";
+
       while (true) {
         const { done, value } = await reader.read();
         buf += dec.decode(value || new Uint8Array(), { stream: !done });
         const parts = buf.split("\n");
         buf = parts.pop() || "";
+
         for (const line of parts) {
           if (!line.trim()) continue;
           const d = JSON.parse(line);
           if (d.error) status.textContent = d.error;
+
           if (d.email) {
             const item = leads.find(l => l.email === d.email);
             if (item) item.status = d.status;
           }
+
           if (typeof d.sent === "number") {
             bar.style.width = Math.min(100, (d.doneCount / d.total) * 100) + "%";
             status.textContent = `Sent ${d.sent}/${d.total} · failed ${d.failed} · skipped ${d.skipped}`;
           }
+
           render();
         }
+
         if (done) break;
       }
+
       send.disabled = false;
     };
   </script>

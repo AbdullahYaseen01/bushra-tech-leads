@@ -175,6 +175,7 @@ const SKIP_HOST = /^(example\.com|google\.com|gmail\.google\.com|sentry\.io|wixp
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 const BAD_EXT = /\.(png|jpe?g|gif|webp|svg|css|js|woff2?|mp4|pdf)$/i;
 
+
 function loadDb() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(DB_PATH)) {
@@ -204,6 +205,7 @@ function saveDb(db) {
 function domainOf(email) {
   return email.split("@")[1]?.toLowerCase() || "";
 }
+
 
 function rootHost(url) {
   try {
@@ -404,6 +406,7 @@ const app = express();
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
+
 app.get("/api/countries", (_req, res) => {
   res.json(Object.keys(CITIES));
 });
@@ -411,6 +414,7 @@ app.get("/api/countries", (_req, res) => {
 app.get("/api/industries", (_req, res) => {
   res.json(Object.keys(INDUSTRY_CATEGORIES));
 });
+
 
 app.get("/api/generate", async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
@@ -518,24 +522,30 @@ app.get("/api/mail-ready", (_req, res) => {
   res.json({ ready: mailReady() });
 });
 
+
 app.post("/api/send", async (req, res) => {
   res.setHeader("Content-Type", "application/x-ndjson");
   const write = (obj) => res.write(JSON.stringify(obj) + "\n");
+
   if (!mailReady()) {
     write({ error: "Add SMTP_USER and SMTP_PASS to .env, then restart." });
     return res.end();
   }
+
   const incoming = Array.isArray(req.body?.leads) ? req.body.leads : [];
   const customTemplate = req.body?.customTemplate;
   const db = loadDb();
   if (!Array.isArray(db.sent)) db.sent = [];
+
   const sentSet = new Set(db.sent);
   const mailer = transporter();
   const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+
   let sent = 0;
   let failed = 0;
   let skipped = 0;
   const total = incoming.length;
+
   for (let i = 0; i < incoming.length; i++) {
     const email = String(incoming[i]?.email || "").trim().toLowerCase();
     const name = String(incoming[i]?.name || "").trim();
