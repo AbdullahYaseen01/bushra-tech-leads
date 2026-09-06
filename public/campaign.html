@@ -32,7 +32,7 @@
     <section class="panel">
       <label class="drop" id="drop">
         <strong>Drop your leads CSV here</strong>
-        <p>or click to upload · columns: name, email</p>
+        <p>or click to upload your list</p>
         <input id="file" type="file" accept=".csv,text/csv" hidden />
       </label>
       <div class="row">
@@ -44,7 +44,7 @@
       <div class="preview" style="display:flex;flex-direction:column;gap:12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <h3 style="margin:0;">Email Template (Editable)</h3>
-          <span style="font-size:0.8rem;color:var(--muted);">Use <code>{{name}}</code> for business name</span>
+          <span style="font-size:0.8rem;color:var(--muted);">Business name is filled in automatically for each lead</span>
         </div>
         <div>
           <label for="tmplSubject" style="margin-bottom:6px;">Subject</label>
@@ -135,7 +135,7 @@ https://bushratech.com`
     };
 
     fetch("/api/mail-ready").then(r => r.json()).then(j => {
-      mailStatus.textContent = j.ready ? "Mailbox ready" : "Add SMTP_USER and SMTP_PASS in .env";
+      mailStatus.textContent = j.ready ? "Ready to send" : "Email not connected";
       mailStatus.className = "chip " + (j.ready ? "ok" : "bad");
     });
 
